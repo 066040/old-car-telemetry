@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#000000">
+<title>Toros Gösterge</title>
+<style>
+:root{--bottom:60px;--fg:#f2f2f2;--dim:#8a8a8a;--ok:#3ddc84;--warn:#ffb020;--bad:#ff4d4d;--card:#141414;--line:#2a2a2a}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#000;color:var(--fg);font-family:Roboto,Arial,sans-serif;overflow:hidden}
+#app{position:absolute;top:0;left:0;right:0;bottom:var(--bottom);display:flex;flex-direction:column}
+#mask{position:absolute;left:0;right:0;bottom:0;height:var(--bottom);background:#000}
+#mask.show{background:repeating-linear-gradient(45deg,#500,#500 8px,#000 8px,#000 16px)}
+nav{display:flex;align-items:center;gap:4px;padding:6px 6px 4px}
+nav button{flex:1;background:var(--card);color:var(--dim);border:1px solid var(--line);border-radius:8px;padding:9px 0;font-size:14px}
+nav button.on{color:#000;background:var(--fg)}
+#gps{width:12px;height:12px;border-radius:50%;background:var(--bad);flex:0 0 12px;margin:0 4px}
+.view{display:none;flex:1;flex-direction:column;padding:6px 10px 10px;overflow-y:auto}
+.view.on{display:flex}
+#speed{font-size:118px;font-weight:700;text-align:center;line-height:1;letter-spacing:-4px;font-variant-numeric:tabular-nums}
+.edsOn #speed{font-size:84px}
+.unit{text-align:center;color:var(--dim);font-size:14px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.cell{background:var(--card);border-radius:10px;padding:8px}
+.cell b{display:block;font-size:26px;font-variant-numeric:tabular-nums}
+.cell span{font-size:12px;color:var(--dim)}
+.big{width:100%;border:0;border-radius:12px;padding:16px;font-size:19px;font-weight:700;margin-top:10px}
+.go{background:var(--ok);color:#000}.stop{background:var(--bad);color:#fff}.sec{background:var(--card);color:var(--fg);border:1px solid var(--line)}
+#eds{display:none;border:2px solid var(--warn);border-radius:12px;padding:8px;margin-top:6px}
+#eds .row{display:flex;justify-content:space-between;font-weight:700;color:var(--warn)}
+#eds .grid{margin-top:4px}
+.tip{margin-top:6px;font-size:15px;text-align:center}
+label{display:block;font-size:13px;color:var(--dim);margin-top:10px}
+input[type=text]{display:block;width:100%;margin-top:4px;background:var(--card);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:12px;font-size:18px}
+input[type=range]{display:block;width:100%;margin-top:8px}
+.chk{display:flex;align-items:center;gap:10px;font-size:16px;color:var(--fg);margin-top:14px}
+.chk input{width:22px;height:22px}
+.hint{font-size:12px;color:var(--dim);margin-top:8px;line-height:1.4}
+.item{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--line)}
+.item b{display:block;font-size:15px}.item span{font-size:13px;color:var(--dim)}
+.item button{background:none;border:1px solid var(--line);color:var(--dim);border-radius:6px;padding:6px 10px;flex:0 0 auto}
+details{margin-top:12px;color:var(--dim)}summary{padding:8px 0}
+h3{font-size:13px;color:var(--dim);margin-top:16px;font-weight:400;text-transform:uppercase;letter-spacing:1px}
+</style>
+</head>
+<body>
+<div id="app">
+  <nav>
+    <span id="gps"></span>
+    <button data-v="drive" class="on">Sürüş</button>
+    <button data-v="fuel">Yakıt</button>
+    <button data-v="eds">EDS</button>
+    <button data-v="set">Ayar</button>
+  </nav>
+
+  <section id="v-drive" class="view on">
+    <div id="speed">–</div><div class="unit">km/h</div>
+    <div id="eds">
+      <div class="row"><span id="edsName">EDS</span><span id="edsLimit"></span></div>
+      <div class="grid">
+        <div class="cell"><span>Koridor ort.</span><b id="edsAvg">–</b></div>
+        <div class="cell"><span>Kalan</span><b id="edsLeft">–</b></div>
+      </div>
+      <div id="edsTip" class="tip"></div>
+    </div>
+    <div class="grid">
+      <div class="cell"><span>Ortalama</span><b id="tAvg">–</b></div>
+      <div class="cell"><span>Mesafe (km)</span><b id="tDist">0.0</b></div>
+      <div class="cell"><span>Süre</span><b id="tTime">0:00</b></div>
+      <div class="cell"><span>Maks.</span><b id="tMax">0</b></div>
+    </div>
+    <button id="tripBtn" class="big go">Yolculuğu Başlat</button>
+  </section>
+
+  <section id="v-fuel" class="view">
+    <div class="cell"><span>Ortalama tüketim</span><b id="fAvg">–</b></div>
+    <label>Alınan yakıt (litre)<input id="fL" type="text" inputmode="decimal" placeholder="örn. 32,5"></label>
+    <label>Kilometre sayacı (isteğe bağlı)<input id="fKm" type="text" inputmode="numeric" placeholder="örn. 184250"></label>
+    <button id="fAdd" class="big go">Depoyu doldurdum</button>
+    <p class="hint">Her seferinde depoyu tam doldur. Tüketim iki dolum arasındaki mesafeden hesaplanır. Kilometre sayacını girersen o kullanılır, girmezsen uygulamanın GPS ile ölçtüğü mesafe.</p>
+    <div id="fList"></div>
+  </section>
+
+  <section id="v-eds" class="view">
+    <label>Koridor adı<input id="eName" type="text" placeholder="örn. Eskişehir yolu"></label>
+    <label>Hız limiti (km/h)<input id="eLimit" type="text" inputmode="numeric" value="90"></label>
+    <button id="eRec" class="big sec">Başlangıç noktasını kaydet</button>
+    <details>
+      <summary>Koordinatla elle ekle</summary>
+      <label>Başlangıç (enlem, boylam)<input id="eA" type="text" placeholder="39.9208, 32.8541"></label>
+      <label>Bitiş (enlem, boylam)<input id="eB" type="text" placeholder="39.9050, 32.7600"></label>
+      <button id="eManual" class="big sec">Ekle</button>
+      <p class="hint">Koordinatı Google Haritalar'da noktaya basılı tutarak kopyalayabilirsin. Elle eklenen koridorun uzunluğu tahminidir; içinden ilk geçişte gerçek uzunluk ölçülür.</p>
+    </details>
+    <h3>Kayıtlı koridorlar</h3>
+    <div id="eList"></div>
+  </section>
+
+  <section id="v-set" class="view">
+    <label>Alt kapalı alan: <b id="bVal"></b> px (çizgili alan görünmez olacak)<input id="bRange" type="range" min="0" max="160" step="2"></label>
+    <label class="chk"><input id="voice" type="checkbox"> Sesli uyarılar</label>
+    <label class="chk"><input id="auto" type="checkbox"> Otomatik yolculuk</label>
+    <p class="hint">Araç hareket edince yolculuk kendiliğinden başlar; 5 dakika durunca otomatik kaydedilir. Kırmızı ışıkta, trafikte bölünmez.</p>
+    <button id="fs" class="big sec">Tam ekran</button>
+    <button id="exp" class="big sec">Verileri indir (JSON)</button>
+    <div class="cell" style="margin-top:10px"><span>Toplam GPS mesafesi</span><b id="odo">0</b></div>
+    <h3>Son yolculuklar</h3>
+    <div id="tList"></div>
+  </section>
+</div>
+<div id="mask"></div>
+
+<script>
+(function(){
+'use strict';
+var KEY='toros_gosterge_v1';
+var db={odo:0,trip:null,trips:[],fills:[],corr:[],bottom:60,voice:true,auto:true};
+try{var s=localStorage.getItem(KEY);if(s){var o=JSON.parse(s);for(var k in o)db[k]=o[k];}}catch(e){}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(db));}catch(e){}}
+function $(id){return document.getElementById(id);}
+function pad(n){return n<10?'0'+n:''+n;}
+function km(m){return (m/1000).toFixed(1);}
+function fmtT(sec){sec=Math.max(0,Math.floor(sec));var h=Math.floor(sec/3600),m=Math.floor(sec%3600/60),s=sec%60;return h?h+':'+pad(m)+':'+pad(s):m+':'+pad(s);}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function num(v){return parseFloat(String(v).replace(',','.'));}
+function hav(a,b){var R=6371000,r=Math.PI/180,dLat=(b.lat-a.lat)*r,dLng=(b.lng-a.lng)*r;
+  var x=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin(dLng/2)*Math.sin(dLng/2);
+  return 2*R*Math.asin(Math.min(1,Math.sqrt(x)));}
+function say(t){if(!db.voice||!window.speechSynthesis)return;try{var u=new SpeechSynthesisUtterance(t);u.lang='tr-TR';speechSynthesis.cancel();speechSynthesis.speak(u);}catch(e){}}
+
+/* ---------- Ekran alanı ---------- */
+function applyBottom(){document.documentElement.style.setProperty('--bottom',db.bottom+'px');$('bVal').textContent=db.bottom;$('bRange').value=db.bottom;}
+$('bRange').addEventListener('input',function(){db.bottom=parseInt(this.value,10);applyBottom();save();});
+
+/* ---------- Sekmeler ---------- */
+var navBtns=document.querySelectorAll('nav button[data-v]');
+for(var i=0;i<navBtns.length;i++)navBtns[i].addEventListener('click',function(){show(this.getAttribute('data-v'));});
+function show(v){
+  for(var i=0;i<navBtns.length;i++)navBtns[i].classList.toggle('on',navBtns[i].getAttribute('data-v')===v);
+  var vs=document.querySelectorAll('.view');for(var j=0;j<vs.length;j++)vs[j].classList.toggle('on',vs[j].id==='v-'+v);
+  $('mask').classList.toggle('show',v==='set');
+  if(v==='fuel')renderFuel();if(v==='eds')renderEds();if(v==='set')renderSet();
+}
+
+/* ---------- GPS ---------- */
+var last=null,lastFix=0,act=null,rec=null,cool={},moveCnt=0;
+var STOP_MS=5*60*1000;   /* 5 dk hareketsiz → yolculuk kaydedilir */
+var MAX_ACC=35,MIN_SPD=3;
+function onPos(p){
+  var c=p.coords,now=p.timestamp||Date.now();lastFix=Date.now();
+  $('gps').style.background=c.accuracy<=15?'var(--ok)':c.accuracy<=MAX_ACC?'var(--warn)':'var(--bad)';
+  if(c.accuracy>MAX_ACC)return;               /* zayıf sinyali kullanma */
+  var pt={lat:c.latitude,lng:c.longitude,t:now},spd=0;
+  if(last){
+    var d=hav(last,pt),dt=(now-last.t)/1000;
+    if(dt>0){
+      var gs=(typeof c.speed==='number'&&!isNaN(c.speed)&&c.speed>=0);
+      spd=gs?c.speed*3.6:d/dt*3.6;
+      if(spd>MIN_SPD&&d/dt<70){                 /* duruşta GPS kaymasını ve sıçramaları say */
+        db.odo+=d;
+        if(db.trip){db.trip.dist+=d;if(spd>db.trip.max)db.trip.max=spd;}
+        if(act)act.dist+=d;
+      }
+    }
+  }
+  last=pt;
+  /* otomatik yolculuk: 3 ardışık ölçüm 10 km/h üstü → başlat */
+  if(spd>10){moveCnt++;if(db.trip)db.trip.lastMove=now;}else moveCnt=0;
+  if(db.auto&&!db.trip&&moveCnt>=3){db.trip={start:now,dist:0,max:spd,lastMove:now,auto:true};wake();save();tripBtnState();say('Yolculuk başladı');}
+  $('speed').textContent=Math.round(spd>MIN_SPD?spd:0);
+  checkEds(pt,now);
+}
+function startGps(){
+  if(!navigator.geolocation){alert('Bu tarayıcı konum desteklemiyor.');return;}
+  navigator.geolocation.watchPosition(onPos,function(e){
+    $('gps').style.background='var(--bad)';
+    if(e.code===1)alert('Konum izni verilmedi. Tarayıcı ayarlarından bu siteye konum izni ver.');
+  },{enableHighAccuracy:true,maximumAge:0,timeout:20000});
+}
+
+/* ---------- Ekranı açık tut ---------- */
+function wake(){if('wakeLock' in navigator){navigator.wakeLock.request('screen').catch(function(){});}}
+document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')wake();});
+
+/* ---------- Yolculuk ---------- */
+function tripBtnState(){var b=$('tripBtn');if(db.trip){b.textContent='Yolculuğu Bitir';b.className='big stop';}else{b.textContent='Yolculuğu Başlat';b.className='big go';}}
+function endTrip(endT){
+  var t=db.trip;if(!t)return;
+  if(t.dist>100)db.trips.unshift({start:t.start,end:Math.max(endT,t.start),dist:Math.round(t.dist),max:Math.round(t.max),auto:!!t.auto});
+  if(db.trips.length>100)db.trips.length=100;db.trip=null;save();tripBtnState();
+}
+$('tripBtn').addEventListener('click',function(){
+  if(!db.trip){db.trip={start:Date.now(),dist:0,max:0,lastMove:Date.now()};wake();save();tripBtnState();}
+  else endTrip(Date.now());
+});
+/* sayfa kapanırken / arka plana geçerken anında kaydet */
+window.addEventListener('pagehide',save);
+document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')save();});
+
+/* ---------- EDS ---------- */
+var R_EDS=80;
+function edsShow(on){$('eds').style.display=on?'block':'none';$('v-drive').classList.toggle('edsOn',on);}
+function checkEds(pt,now){
+  if(rec)return;
+  if(act){
+    if(hav(pt,act.c.b)<R_EDS){finishEds(now);return;}
+    if(act.dist>act.c.len*1.5+500){act=null;edsShow(false);}   /* ters yönden girildi / yoldan çıkıldı */
+    return;
+  }
+  for(var i=0;i<db.corr.length;i++){
+    var c=db.corr[i];
+    if(cool[c.id]&&now-cool[c.id]<120000)continue;
+    if(hav(pt,c.a)<R_EDS){
+      act={c:c,t0:now,dist:0,warned:0};
+      $('edsName').textContent=c.name;$('edsLimit').textContent='Limit '+c.limit;edsShow(true);
+      say('Ortalama hız koridoru başladı. Limit '+c.limit);break;
+    }
+  }
+}
+function finishEds(now){
+  var c=act.c,el=(now-act.t0)/1000,avg=el>0?act.dist/el*3.6:0;
+  if(act.dist>200){c.len=c.measured?Math.round((c.len+act.dist)/2):Math.round(act.dist);c.measured=true;}
+  c.last=Math.round(avg);cool[c.id]=now;save();
+  say('Koridor bitti. Ortalaman '+Math.round(avg));
+  act=null;edsShow(false);
+}
+function updEds(){
+  if(!act)return;
+  var c=act.c,el=(Date.now()-act.t0)/1000,avg=el>5?act.dist/el*3.6:0,left=Math.max(0,c.len-act.dist);
+  $('edsAvg').textContent=el>5?Math.round(avg):'–';
+  $('edsAvg').style.color=avg>c.limit?'var(--bad)':'var(--fg)';
+  $('edsLeft').textContent=km(left)+' km';
+  var budget=c.len/(c.limit/3.6)-el,tip;     /* limite göre kalan süre hakkı (sn) */
+  if(left<=0)tip='Bitişe yaklaşıyorsun';
+  else if(budget<=0)tip='Ortalaman güvende. Yol limitine uy: '+c.limit;
+  else{var mx=left/budget*3.6;
+    tip=mx>=c.limit?'Limite uyarsan ortalama sorun yok ('+c.limit+')':'Ortalama için en fazla <b style="color:var(--warn)">'+Math.round(mx)+'</b> km/h';}
+  $('edsTip').innerHTML=tip;
+  if(avg>c.limit&&el>20&&Date.now()-act.warned>30000){act.warned=Date.now();say('Ortalaman limitin üstünde');}
+}
+$('eRec').addEventListener('click',function(){
+  if(!last||Date.now()-lastFix>6000){alert('GPS sinyali bekleniyor.');return;}
+  if(!rec){
+    var lim=parseInt($('eLimit').value,10);if(!(lim>0)){alert('Hız limitini gir.');return;}
+    rec={name:$('eName').value.trim()||('EDS '+(db.corr.length+1)),limit:lim,a:{lat:last.lat,lng:last.lng},odo0:db.odo};
+    this.textContent='Bitiş noktasını kaydet';this.className='big stop';say('Başlangıç kaydedildi');
+  }else{
+    var len=db.odo-rec.odo0;
+    if(len<300&&!confirm('Sadece '+Math.round(len)+' m gidildi. Yine de kaydedilsin mi?'))return;
+    db.corr.push({id:Date.now(),name:rec.name,limit:rec.limit,a:rec.a,b:{lat:last.lat,lng:last.lng},
+      len:Math.round(Math.max(len,hav(rec.a,last))),measured:len>=300});
+    rec=null;save();this.textContent='Başlangıç noktasını kaydet';this.className='big sec';
+    say('Koridor kaydedildi');renderEds();
+  }
+});
+function parseLL(s){var m=String(s).match(/(-?\d+(?:\.\d+)?)\s*[,; ]\s*(-?\d+(?:\.\d+)?)/);return m?{lat:parseFloat(m[1]),lng:parseFloat(m[2])}:null;}
+$('eManual').addEventListener('click',function(){
+  var a=parseLL($('eA').value),b=parseLL($('eB').value),lim=parseInt($('eLimit').value,10);
+  if(!a||!b||!(lim>0)){alert('Koordinatları "39.92, 32.85" şeklinde ve limiti gir.');return;}
+  db.corr.push({id:Date.now(),name:$('eName').value.trim()||('EDS '+(db.corr.length+1)),limit:lim,a:a,b:b,
+    len:Math.round(hav(a,b)*1.05),measured:false});
+  save();$('eA').value='';$('eB').value='';renderEds();
+});
+function renderEds(){
+  var h='';
+  for(var i=0;i<db.corr.length;i++){var c=db.corr[i];
+    h+='<div class="item"><div><b>'+esc(c.name)+'</b><span>'+c.limit+' km/h · '+km(c.len)+' km'+(c.measured?'':' (tahmini)')+
+       (c.last!=null?' · son ort. '+c.last:'')+'</span></div><button data-del="'+i+'">Sil</button></div>';}
+  $('eList').innerHTML=h||'<p class="hint">Henüz koridor yok.</p>';
+}
+$('eList').addEventListener('click',function(e){var i=e.target.getAttribute('data-del');if(i===null)return;
+  if(confirm('Koridor silinsin mi?')){db.corr.splice(+i,1);save();renderEds();}});
+
+/* ---------- Yakıt ---------- */
+$('fAdd').addEventListener('click',function(){
+  var l=num($('fL').value);if(!(l>0)){alert('Alınan litreyi gir.');return;}
+  var k=num($('fKm').value);
+  db.fills.push({t:Date.now(),l:l,odo:Math.round(db.odo),km:k>0?k:null});
+  save();$('fL').value='';$('fKm').value='';renderFuel();
+});
+function fillDist(a,b){return(a.km!=null&&b.km!=null)?(b.km-a.km)*1000:(b.odo-a.odo);}
+function renderFuel(){
+  var f=db.fills,h='',L=0,D=0;
+  for(var i=f.length-1;i>=0;i--){
+    var x=f[i],line=new Date(x.t).toLocaleDateString('tr-TR')+' · '+x.l+' L';
+    if(i>0){var d=fillDist(f[i-1],x);
+      if(d>1000){line+=' · '+km(d)+' km · <b style="display:inline;color:var(--fg)">'+(x.l/(d/1000)*100).toFixed(1)+' L/100</b>';L+=x.l;D+=d;}}
+    h+='<div class="item"><div><span>'+line+'</span></div><button data-fdel="'+i+'">Sil</button></div>';
+  }
+  $('fList').innerHTML=h||'<p class="hint">İlk dolumda tüketim çıkmaz; ikinci dolumdan itibaren hesaplanır.</p>';
+  $('fAvg').textContent=D>0?(L/(D/1000)*100).toFixed(1)+' L/100 km':'–';
+}
+$('fList').addEventListener('click',function(e){var i=e.target.getAttribute('data-fdel');if(i===null)return;
+  if(confirm('Dolum kaydı silinsin mi?')){db.fills.splice(+i,1);save();renderFuel();}});
+
+/* ---------- Ayarlar ---------- */
+$('voice').addEventListener('change',function(){db.voice=this.checked;save();if(db.voice)say('Sesli uyarılar açık');});
+$('auto').addEventListener('change',function(){db.auto=this.checked;save();});
+$('fs').addEventListener('click',function(){
+  var el=document.documentElement,rq=el.requestFullscreen||el.webkitRequestFullscreen;
+  if(rq){var r=rq.call(el);var lock=function(){try{screen.orientation.lock('portrait').catch(function(){});}catch(e){}};
+    if(r&&r.then)r.then(lock).catch(function(){});else lock();}
+  wake();
+});
+$('exp').addEventListener('click',function(){
+  var b=new Blob([JSON.stringify(db,null,2)],{type:'application/json'}),a=document.createElement('a');
+  a.href=URL.createObjectURL(b);a.download='toros-veri.json';document.body.appendChild(a);a.click();document.body.removeChild(a);
+});
+function renderSet(){
+  $('odo').textContent=km(db.odo)+' km';
+  var h='';
+  for(var i=0;i<Math.min(db.trips.length,15);i++){var t=db.trips[i],el=(t.end-t.start)/1000;
+    h+='<div class="item"><div><b>'+new Date(t.start).toLocaleString('tr-TR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+
+       '</b><span>'+km(t.dist)+' km · '+fmtT(el)+' · ort. '+(el>0?Math.round(t.dist/el*3.6):0)+' · maks. '+t.max+'</span></div></div>';}
+  $('tList').innerHTML=h||'<p class="hint">Henüz yolculuk yok.</p>';
+}
+
+/* ---------- Saniyelik güncelleme ---------- */
+var tick=0;
+setInterval(function(){
+  if(Date.now()-lastFix>6000){$('gps').style.background='var(--bad)';$('speed').textContent='–';}
+  var t=db.trip;
+  if(t){var el=(Date.now()-t.start)/1000;
+    $('tTime').textContent=fmtT(el);$('tDist').textContent=km(t.dist);$('tMax').textContent=Math.round(t.max);
+    $('tAvg').textContent=el>10?Math.round(t.dist/el*3.6):'–';}
+  updEds();
+  /* otomatik bitiş: son hareketten 5 dk geçtiyse, bitiş zamanı = son hareket anı */
+  if(db.auto&&db.trip&&db.trip.lastMove&&Date.now()-db.trip.lastMove>STOP_MS){endTrip(db.trip.lastMove);say('Yolculuk kaydedildi');}
+  if(++tick%10===0)save();
+},1000);
+
+/* ---------- Başlat ---------- */
+applyBottom();$('voice').checked=!!db.voice;$('auto').checked=db.auto!==false;
+if(db.trip&&!db.trip.lastMove)db.trip.lastMove=Date.now();tripBtnState();startGps();
+document.addEventListener('click',function once(){wake();document.removeEventListener('click',once);});
+})();
+</script>
+</body>
+</html>
